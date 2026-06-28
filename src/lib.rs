@@ -247,14 +247,19 @@ fn match_key_val(line: &str) -> Option<(&str, &str)> {
 /// Parse a config file at `path`, returning an empty object if it does not exist.
 ///
 /// Reads the file as UTF-8 and delegates to [`parse`]. A missing file yields an
-/// empty object with no error.
+/// empty object with no error. A file that exists but cannot be read panics, so
+/// a real failure such as a permission error, a directory in place of a file, or
+/// invalid UTF-8 surfaces instead of looking the same as an absent file.
 pub fn parse_file(path: &std::path::Path, options: &RcOptions) -> Value {
     if !path.exists() {
         return Value::Object(Map::new());
     }
     match std::fs::read_to_string(path) {
         Ok(contents) => parse(&contents, options),
-        Err(_) => Value::Object(Map::new()),
+        // The file vanished between the existence check and the read. Treat the
+        // race the same as a missing file.
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Value::Object(Map::new()),
+        Err(err) => panic!("failed to read config file {}: {err}", path.display()),
     }
 }
 
