@@ -104,6 +104,17 @@ fn update_arrays_concatenate_incoming_first() {
 }
 
 #[test]
+fn update_object_element_arrays_concatenate_without_deep_merge() {
+    // Object-valued array elements concatenate the same way scalars do. The
+    // incoming element comes first, then the existing one. The two objects are
+    // not deep-merged with each other.
+    let tmp = TempDir::new().unwrap();
+    rc9::write(&json!({ "items": [{ "b": 2 }] }), &dir_opts(&tmp)).unwrap();
+    let merged = rc9::update(&json!({ "items": [{ "a": 1 }] }), &dir_opts(&tmp)).unwrap();
+    assert_eq!(merged["items"], json!([{ "a": 1 }, { "b": 2 }]));
+}
+
+#[test]
 fn update_null_does_not_clobber() {
     let tmp = TempDir::new().unwrap();
     rc9::write(&json!({ "x": "keep" }), &dir_opts(&tmp)).unwrap();

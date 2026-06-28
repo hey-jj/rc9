@@ -74,3 +74,12 @@ fn insertion_order_is_preserved() {
     let input = json!({ "zebra": 1, "alpha": 2, "mango": 3 });
     assert_eq!(rc9::serialize(&input), "zebra=1\nalpha=2\nmango=3");
 }
+
+#[test]
+fn top_level_scalar_serializes_to_empty() {
+    // serialize takes a config object. A bare scalar at the top level is a
+    // misuse and produces an empty string. A top-level string returns empty too,
+    // a deliberate boundary: the canonical form would split it by character index.
+    assert_eq!(rc9::serialize(&json!("hello")), "");
+    assert_eq!(rc9::serialize(&json!(42)), "");
+}
