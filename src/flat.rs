@@ -13,8 +13,10 @@ use serde_json::{Map, Value};
 /// `{"a.0":"x","a.1":"y"}`. Empty objects and arrays stay as leaf values.
 /// Scalars are leaves.
 ///
-/// Input that is not an object returns an empty map, which matches the source
-/// when given a non-object top-level value.
+/// A top-level value that is not an object or array returns an empty map. The
+/// public entry point [`crate::serialize`] takes a config object, so a bare
+/// scalar at the top level is a misuse. A top-level string is one boundary case:
+/// it returns empty here rather than splitting into character-indexed keys.
 pub fn flatten(target: &Value) -> Map<String, Value> {
     let mut output = Map::new();
     if let Value::Object(_) | Value::Array(_) = target {
@@ -63,27 +65,41 @@ enum Key {
     Name(String),
 }
 
+/// The largest array index a path segment may create.
+///
+/// A numeric segment grows the backing array to fit its index, so an unbounded
+/// index lets one line drive a huge allocation. A segment whose index exceeds
+/// this bound becomes an object key instead, which caps the allocation while
+/// leaving realistic config untouched. The bound sits far above any sane config
+/// array length and far below a size that would strain the allocator.
+const MAX_ARRAY_INDEX: usize = 100_000;
+
 /// Decide whether a segment is an array index or an object key.
 ///
-/// A segment is an array index when it parses as a finite number and contains no
-/// dot. This follows the source rule built on a permissive numeric coercion. The
-/// realistic config case is a plain non-negative integer.
+/// A segment is an array index when it is a plain non-negative decimal integer,
+/// contains no dot, and does not exceed [`MAX_ARRAY_INDEX`]. The decimal-only
+/// rule is a deliberate subset of the permissive numeric coercion the source
+/// uses. The source accepts a leading sign and the `0x`, `0b`, and `0o` radix
+/// prefixes as well, since it runs `Number(segment)`. Those forms do not appear
+/// in generated keys or in hand-written config, so this treats them as object
+/// keys. A segment past the index bound also falls back to an object key.
 fn get_key(segment: &str) -> Key {
     if !segment.contains('.') {
         if let Some(n) = js_number_index(segment) {
-            return Key::Index(n);
+            if n <= MAX_ARRAY_INDEX {
+                return Key::Index(n);
+            }
         }
     }
     Key::Name(segment.to_string())
 }
 
-/// Parse a segment as an array index, mirroring the permissive numeric coercion.
+/// Parse a segment as an array index from its plain decimal form.
 ///
-/// Returns `Some(index)` when the segment coerces to a non-negative integer.
-/// Handles the forms that appear in config keys: plain decimal integers,
-/// empty and whitespace-only strings (which coerce to zero), and surrounding
-/// whitespace. Returns `None` for anything that is not a finite non-negative
-/// integer index, including floats with a fractional part and negative numbers.
+/// Returns `Some(index)` when the segment is a non-negative decimal integer,
+/// possibly with surrounding whitespace, or empty or whitespace-only (which
+/// coerces to zero). Returns `None` for a leading sign, a radix prefix, a
+/// fractional part, or anything else that is not a plain index.
 fn js_number_index(segment: &str) -> Option<usize> {
     let trimmed = segment.trim_matches(crate::destr::js_whitespace);
     // An empty or whitespace-only segment coerces to zero.
