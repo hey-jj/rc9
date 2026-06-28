@@ -22,15 +22,21 @@ use serde_json::Value;
 ///
 /// Never fails. On any parse problem it returns the input as a string value.
 pub fn destr(value: &str) -> Value {
-    // 1. Quoted-string fast path. A value that opens and closes with `"` and has
-    //    no backslash anywhere returns the text between the quotes. No unescaping.
+    // 1. Quoted-string fast path. A value whose first and last byte are both `"`
+    //    and that holds no backslash returns the text between the quotes. No
+    //    unescaping. The check compares the first and last byte by index with no
+    //    length floor, so a lone `"` has both pointing at the same byte and the
+    //    inner slice is empty.
     let bytes = value.as_bytes();
-    if bytes.len() >= 2
+    if !bytes.is_empty()
         && bytes[0] == b'"'
         && bytes[bytes.len() - 1] == b'"'
         && !value.contains('\\')
     {
-        return Value::String(value[1..value.len() - 1].to_string());
+        // For a single `"`, start (1) meets end (len - 1 = 0), so the slice is
+        // empty. `saturating_sub` keeps the range valid at length 1.
+        let end = value.len().saturating_sub(1);
+        return Value::String(value[1.min(end)..end].to_string());
     }
 
     // 2. Keyword path. Only consider the trimmed value when it is short enough.
@@ -54,12 +60,28 @@ pub fn destr(value: &str) -> Value {
         return Value::String(value.to_string());
     }
 
-    // 4. JSON parse with a prototype-pollution filter. On failure return the raw
-    //    string. A successful parse yields the native value.
+    // 4. JSON parse with a prototype-pollution filter. A successful parse yields
+    //    the native value. On failure, a numeric overflow coerces to null, since
+    //    a permissive JSON number parse returns an infinity for `1e400` and an
+    //    infinity has no JSON form. Any other failure returns the raw string.
     match serde_json::from_str::<Value>(value) {
         Ok(parsed) => normalize(strip_dangerous_keys(parsed)),
+        Err(_) if is_number_overflow(value) => Value::Null,
         Err(_) => Value::String(value.to_string()),
     }
+}
+
+/// Whether a value is a number that overflows the double range to an infinity.
+///
+/// Reached only from the JSON-parse failure arm. A value like `1e400` matches
+/// the number gate and parses to an infinity in floating point, while a value
+/// like `01` parses to a finite number and fails the JSON parse for a different
+/// reason (a leading zero). The infinity check separates the two.
+fn is_number_overflow(value: &str) -> bool {
+    js_trim(value)
+        .parse::<f64>()
+        .map(|n| n.is_infinite())
+        .unwrap_or(false)
 }
 
 /// Normalize parsed numbers to match the single-number-type model.
