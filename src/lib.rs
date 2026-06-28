@@ -83,18 +83,6 @@ impl RcOptions {
     }
 }
 
-impl From<&str> for RcOptions {
-    fn from(name: &str) -> Self {
-        RcOptions::name(name)
-    }
-}
-
-impl From<String> for RcOptions {
-    fn from(name: String) -> Self {
-        RcOptions::name(name)
-    }
-}
-
 /// Options with every field resolved to a concrete value.
 struct Resolved {
     name: String,
