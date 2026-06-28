@@ -325,6 +325,12 @@ fn encode_value(value: &Value) -> String {
         if !num.is_i64() && !num.is_u64() {
             if let Some(f) = num.as_f64() {
                 if f.is_finite() && f.fract() == 0.0 && f.abs() < 1e21 {
+                    // Negative zero prints as a bare 0. `-0.0 == 0.0` holds in
+                    // IEEE-754, so this equality test catches both signs and
+                    // drops the sign byte that `{:.0}` would emit for -0.0.
+                    if f == 0.0 {
+                        return "0".to_string();
+                    }
                     return format!("{f:.0}");
                 }
             }
