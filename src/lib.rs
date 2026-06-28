@@ -140,10 +140,10 @@ pub fn parse(contents: &str, options: &RcOptions) -> Value {
         let value = destr::destr(raw_value.trim_matches(destr::js_whitespace));
 
         if let Some(nkey) = key.strip_suffix("[]") {
-            let entry = config
-                .entry(nkey.to_string())
-                .or_insert_with(|| Value::Array(Vec::new()));
-            push_concat(entry, value);
+            let existing = config.remove(nkey);
+            if let Some(merged) = push_concat(existing, value) {
+                config.insert(nkey.to_string(), merged);
+            }
             continue;
         }
 
@@ -158,16 +158,57 @@ pub fn parse(contents: &str, options: &RcOptions) -> Value {
     }
 }
 
-/// Append a value to an array, spreading the value if it is itself an array.
+/// Apply the array-push rule `(existing || []).concat(value)` for a `[]` key.
 ///
-/// Mirrors array concatenation: an array value appends its elements one by one,
-/// a scalar appends as a single element. The entry is always an array here.
-fn push_concat(entry: &mut Value, value: Value) {
-    if let Value::Array(arr) = entry {
-        match value {
-            Value::Array(items) => arr.extend(items),
-            scalar => arr.push(scalar),
-        }
+/// `existing` is the current value at the stripped key, if any. The rule treats
+/// a falsy existing value as an empty array, so it starts fresh and the pushed
+/// value forms the first elements. A non-empty array extends. A non-empty string
+/// concatenates the pushed value's string form.
+///
+/// `concat` spreads an array argument and appends a scalar as one element.
+///
+/// A non-empty number, a `true`, or an object has no `concat` method, so the
+/// canonical form raises a `TypeError`. This function has no way to fail, so it
+/// returns `None` to leave the existing value in place. That keeps the parser
+/// total and matches the shape of "this push does not apply here".
+fn push_concat(existing: Option<Value>, value: Value) -> Option<Value> {
+    match existing {
+        None => Some(concat_onto_array(Vec::new(), value)),
+        Some(current) if is_js_falsy(&current) => Some(concat_onto_array(Vec::new(), value)),
+        Some(Value::Array(arr)) => Some(concat_onto_array(arr, value)),
+        Some(Value::String(s)) => Some(Value::String(s + &js_string(&value))),
+        Some(other) => Some(other),
+    }
+}
+
+/// Build an array from `base`, appending `value` the way `Array.concat` does.
+fn concat_onto_array(mut base: Vec<Value>, value: Value) -> Value {
+    match value {
+        Value::Array(items) => base.extend(items),
+        scalar => base.push(scalar),
+    }
+    Value::Array(base)
+}
+
+/// Whether a value is falsy by JS rules: `null`, `false`, `0`, or `""`.
+fn is_js_falsy(value: &Value) -> bool {
+    match value {
+        Value::Null => true,
+        Value::Bool(b) => !b,
+        Value::Number(n) => n.as_f64() == Some(0.0),
+        Value::String(s) => s.is_empty(),
+        _ => false,
+    }
+}
+
+/// Render a value as JS string concatenation would, for the string-push case.
+fn js_string(value: &Value) -> String {
+    match value {
+        Value::String(s) => s.clone(),
+        Value::Null => "null".to_string(),
+        Value::Bool(b) => b.to_string(),
+        Value::Number(n) => encode_value(&Value::Number(n.clone())),
+        other => serde_json::to_string(other).unwrap_or_default(),
     }
 }
 
