@@ -8,3 +8,14 @@ repository = "https://github.com/hey-jj/rc9"
 readme = "README.md"
 
 [dependencies]
+# preserve_order keeps object keys in insertion order so serialize emits
+# lines in a stable, predictable sequence.
+serde_json = { version = "1", features = ["preserve_order"] }
+# Resolves the home directory for the user-config helpers.
+dirs = "6"
+
+[dev-dependencies]
+# Isolates filesystem tests in a throwaway directory.
+tempfile = "3"
+# Serializes tests that mutate process-global env vars so they do not race.
+serial_test = "3"
