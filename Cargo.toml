@@ -2,10 +2,12 @@
 name = "rc9"
 version = "0.1.0"
 edition = "2021"
-description = "read/write flat rc-style dotfile config"
+description = "Read and write flat rc-style dotfile config with dotted keys and type coercion"
 license = "MIT"
 repository = "https://github.com/hey-jj/rc9"
 readme = "README.md"
+keywords = ["config", "dotfile", "rc", "ini", "flat"]
+categories = ["config", "parser-implementations", "filesystem"]
 
 [dependencies]
 # preserve_order keeps object keys in insertion order so serialize emits
