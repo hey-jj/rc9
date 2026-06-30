@@ -18,7 +18,7 @@ fn dir_opts(tmp: &TempDir) -> rc9::RcOptions {
 fn write_then_read_round_trip() {
     let tmp = TempDir::new().unwrap();
     rc9::write(&sample_config(), &dir_opts(&tmp)).unwrap();
-    assert_eq!(rc9::read(&dir_opts(&tmp)), sample_config());
+    assert_eq!(rc9::read(&dir_opts(&tmp)).unwrap(), sample_config());
 }
 
 #[test]
@@ -29,7 +29,7 @@ fn read_missing_file_is_empty() {
         dir: Some(tmp.path().to_string_lossy().into_owned()),
         flat: None,
     };
-    assert_eq!(rc9::read(&opts), json!({}));
+    assert_eq!(rc9::read(&opts).unwrap(), json!({}));
 }
 
 #[test]
@@ -37,7 +37,7 @@ fn parse_file_direct() {
     let tmp = TempDir::new().unwrap();
     let path = tmp.path().join(".conf");
     std::fs::write(&path, "name=\"alice\"\nport=8080").unwrap();
-    let parsed = rc9::parse_file(&path, &rc9::RcOptions::default());
+    let parsed = rc9::parse_file(&path, &rc9::RcOptions::default()).unwrap();
     assert_eq!(parsed, json!({ "name": "alice", "port": 8080 }));
 }
 
@@ -46,9 +46,18 @@ fn parse_file_missing_returns_empty() {
     let tmp = TempDir::new().unwrap();
     let path = tmp.path().join("does-not-exist");
     assert_eq!(
-        rc9::parse_file(&path, &rc9::RcOptions::default()),
+        rc9::parse_file(&path, &rc9::RcOptions::default()).unwrap(),
         json!({})
     );
+}
+
+#[test]
+fn parse_file_invalid_utf8_is_err() {
+    // A file that exists but is not UTF-8 returns Err rather than panicking.
+    let tmp = TempDir::new().unwrap();
+    let path = tmp.path().join(".conf");
+    std::fs::write(&path, [0xff, 0xfe, 0x00]).unwrap();
+    assert!(rc9::parse_file(&path, &rc9::RcOptions::default()).is_err());
 }
 
 #[test]
@@ -69,7 +78,7 @@ fn update_merges_with_existing_file() {
     assert_eq!(merged["db"]["username"], json!("db username"));
     assert_eq!(merged["db"]["enabled"], json!(false));
     // The file on disk reflects the merge.
-    let read = rc9::read(&dir_opts(&tmp));
+    let read = rc9::read(&dir_opts(&tmp)).unwrap();
     assert_eq!(read["db"]["password"], json!("updated"));
 }
 
@@ -156,6 +165,6 @@ fn name_shorthand_resolves_in_cwd_relative_dir() {
         &rc9::RcOptions::name(abs.to_string_lossy().into_owned()),
     )
     .unwrap();
-    let read = rc9::read(&rc9::RcOptions::name(abs.to_string_lossy().into_owned()));
+    let read = rc9::read(&rc9::RcOptions::name(abs.to_string_lossy().into_owned())).unwrap();
     assert_eq!(read, json!({ "z": 9 }));
 }

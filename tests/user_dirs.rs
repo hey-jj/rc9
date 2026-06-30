@@ -60,7 +60,7 @@ fn xdg_config_home_is_honored() {
     let path = tmp.path().join(".zoorc");
     assert!(path.exists());
     assert_eq!(
-        rc9::read_user_config(&rc9::RcOptions::name(".zoorc")),
+        rc9::read_user_config(&rc9::RcOptions::name(".zoorc")).unwrap(),
         json!({ "token": 123 })
     );
 }
@@ -108,7 +108,7 @@ fn legacy_user_writes_to_bare_home() {
     assert!(home.path().join(".legacyrc").exists());
     assert!(!home.path().join(".config").join(".legacyrc").exists());
     assert_eq!(
-        rc9::read_user(&rc9::RcOptions::name(".legacyrc")),
+        rc9::read_user(&rc9::RcOptions::name(".legacyrc")).unwrap(),
         json!({ "a": 1 })
     );
 }

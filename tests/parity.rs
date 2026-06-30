@@ -58,7 +58,7 @@ fn write_config() {
     let tmp = TempDir::new().unwrap();
     let opts = dir_opts(tmp.path());
     rc9::write(&sample_config(), &opts).unwrap();
-    assert_matches_subset(&rc9::read(&opts), &sample_config());
+    assert_matches_subset(&rc9::read(&opts).unwrap(), &sample_config());
 }
 
 // Case 2: Write config (user). Round-trip via the user-config directory.
@@ -68,7 +68,7 @@ fn write_config_user() {
     let _user = UserDir::new();
     rc9::write_user_config(&sample_config(), &rc9::RcOptions::default()).unwrap();
     assert_matches_subset(
-        &rc9::read_user_config(&rc9::RcOptions::default()),
+        &rc9::read_user_config(&rc9::RcOptions::default()).unwrap(),
         &sample_config(),
     );
 }
@@ -84,7 +84,7 @@ fn read_config() {
         dir: Some(tmp.path().to_string_lossy().into_owned()),
         flat: None,
     };
-    assert_matches_subset(&rc9::read(&opts), &sample_config());
+    assert_matches_subset(&rc9::read(&opts).unwrap(), &sample_config());
 }
 
 // Case 4: Update user config. Dotted key unflattens, quoted string round-trips,
@@ -99,7 +99,7 @@ fn update_user_config() {
         &rc9::RcOptions::default(),
     )
     .unwrap();
-    let read = rc9::read_user_config(&rc9::RcOptions::default());
+    let read = rc9::read_user_config(&rc9::RcOptions::default()).unwrap();
     assert_eq!(read["db"]["password"], json!("\"123\""));
     // The merge preserves the other db keys from the existing file.
     assert_eq!(read["db"]["username"], json!("db username"));
@@ -113,7 +113,7 @@ fn update_user_config_to_empty_string() {
     let _user = UserDir::new();
     rc9::write_user_config(&sample_config(), &rc9::RcOptions::default()).unwrap();
     rc9::update_user_config(&json!({ "db.password": "" }), &rc9::RcOptions::default()).unwrap();
-    let read = rc9::read_user_config(&rc9::RcOptions::default());
+    let read = rc9::read_user_config(&rc9::RcOptions::default()).unwrap();
     assert_eq!(read["db"]["password"], json!(""));
 }
 
@@ -124,7 +124,7 @@ fn write_user_config_named() {
     let _user = UserDir::new();
     rc9::write_user_config(&sample_config(), &rc9::RcOptions::name(".conf-user")).unwrap();
     assert_matches_subset(
-        &rc9::read_user_config(&rc9::RcOptions::name(".conf-user")),
+        &rc9::read_user_config(&rc9::RcOptions::name(".conf-user")).unwrap(),
         &sample_config(),
     );
 }
@@ -140,7 +140,7 @@ fn update_user_config_named() {
         &rc9::RcOptions::name(".conf-user"),
     )
     .unwrap();
-    let read = rc9::read_user_config(&rc9::RcOptions::name(".conf-user"));
+    let read = rc9::read_user_config(&rc9::RcOptions::name(".conf-user")).unwrap();
     assert_eq!(read["db"]["password"], json!("updated"));
     assert_eq!(read["db"]["username"], json!("db username"));
 }
@@ -170,7 +170,7 @@ fn ignore_non_existent() {
         dir: Some(tmp.path().to_string_lossy().into_owned()),
         flat: None,
     };
-    assert_eq!(rc9::read(&opts), json!({}));
+    assert_eq!(rc9::read(&opts).unwrap(), json!({}));
 }
 
 // Case 10: Flat mode. Dotted keys are not unflattened and coexist.
@@ -184,7 +184,7 @@ fn flat_mode() {
         flat: Some(true),
     };
     rc9::update(&object, &opts).unwrap();
-    assert_matches_subset(&rc9::read(&opts), &object);
+    assert_matches_subset(&rc9::read(&opts).unwrap(), &object);
 }
 
 // Case 11: Parse indexless arrays. `[]` keys push into a nested array.

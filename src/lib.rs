@@ -253,27 +253,27 @@ fn match_key_val(line: &str) -> Option<(&str, &str)> {
 /// Parse a config file at `path`, returning an empty object if it does not exist.
 ///
 /// Reads the file as UTF-8 and delegates to [`parse`]. A missing file yields an
-/// empty object with no error. A file that exists but cannot be read panics, so
-/// a real failure such as a permission error, a directory in place of a file, or
-/// invalid UTF-8 surfaces instead of looking the same as an absent file.
-pub fn parse_file(path: &std::path::Path, options: &RcOptions) -> Value {
+/// empty object with no error. Any other failure, such as a permission error, a
+/// directory in place of a file, or invalid UTF-8, returns `Err` rather than
+/// looking the same as an absent file.
+pub fn parse_file(path: &std::path::Path, options: &RcOptions) -> std::io::Result<Value> {
     if !path.exists() {
-        return Value::Object(Map::new());
+        return Ok(Value::Object(Map::new()));
     }
     match std::fs::read_to_string(path) {
-        Ok(contents) => parse(&contents, options),
+        Ok(contents) => Ok(parse(&contents, options)),
         // The file vanished between the existence check and the read. Treat the
         // race the same as a missing file.
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Value::Object(Map::new()),
-        Err(err) => panic!("failed to read config file {}: {err}", path.display()),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(Value::Object(Map::new())),
+        Err(err) => Err(err),
     }
 }
 
 /// Read and parse a config file from the configured directory and name.
 ///
 /// Resolves the path from `dir` and `name`, then parses it. A missing file
-/// yields an empty object.
-pub fn read(options: &RcOptions) -> Value {
+/// yields an empty object. Other read failures return `Err`.
+pub fn read(options: &RcOptions) -> std::io::Result<Value> {
     let resolved = with_defaults(options);
     let path = resolve::resolve(&resolved.dir, &resolved.name);
     parse_file(&path, options)
@@ -284,14 +284,14 @@ pub fn read(options: &RcOptions) -> Value {
 /// Deprecated. Prefer [`read_user_config`], which follows the XDG convention and
 /// uses `~/.config`.
 #[deprecated(note = "use read_user_config, which uses ~/.config following XDG conventions")]
-pub fn read_user(options: &RcOptions) -> Value {
+pub fn read_user(options: &RcOptions) -> std::io::Result<Value> {
     let mut opts = options.clone();
     opts.dir = Some(legacy_user_dir());
     read(&opts)
 }
 
 /// Read a user config from `$XDG_CONFIG_HOME` or `~/.config`.
-pub fn read_user_config(options: &RcOptions) -> Value {
+pub fn read_user_config(options: &RcOptions) -> std::io::Result<Value> {
     let mut opts = options.clone();
     opts.dir = Some(xdg_config_dir());
     read(&opts)
@@ -395,7 +395,7 @@ pub fn update(config: &Value, options: &RcOptions) -> std::io::Result<Value> {
         flat::unflatten(config)
     };
 
-    let existing = read(options);
+    let existing = read(options)?;
     let new_config = defu::defu(&incoming, &existing);
     write(&new_config, options)?;
     Ok(new_config)

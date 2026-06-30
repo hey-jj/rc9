@@ -43,7 +43,7 @@ Read and write a file by directory and name:
 
 ```rust,no_run
 let opts = rc9::RcOptions::name(".myrc");
-let config = rc9::read(&opts);
+let config = rc9::read(&opts)?;
 rc9::write(&config, &opts)?;
 # Ok::<(), std::io::Error>(())
 ```
@@ -78,7 +78,7 @@ the user config directory, which is `$XDG_CONFIG_HOME` or `~/.config`.
 ```rust,no_run
 use serde_json::json;
 rc9::write_user_config(&json!({ "token": 123 }), &rc9::RcOptions::name(".zoorc"))?;
-let conf = rc9::read_user_config(&rc9::RcOptions::name(".zoorc"));
+let conf = rc9::read_user_config(&rc9::RcOptions::name(".zoorc"))?;
 # Ok::<(), std::io::Error>(())
 ```
 
