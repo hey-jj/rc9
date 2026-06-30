@@ -140,8 +140,14 @@ pub fn parse(contents: &str, options: &RcOptions) -> Value {
         let value = destr::destr(raw_value.trim_matches(destr::js_whitespace));
 
         if let Some(nkey) = key.strip_suffix("[]") {
-            let existing = config.remove(nkey);
-            if let Some(merged) = push_concat(existing, value) {
+            // Update in place so re-touching the key keeps its original position.
+            // push_concat is always Some for an existing value, so the slot never
+            // keeps the null left by take.
+            if let Some(slot) = config.get_mut(nkey) {
+                if let Some(merged) = push_concat(Some(slot.take()), value) {
+                    *slot = merged;
+                }
+            } else if let Some(merged) = push_concat(None, value) {
                 config.insert(nkey.to_string(), merged);
             }
             continue;

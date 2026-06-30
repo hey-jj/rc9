@@ -62,6 +62,14 @@ fn array_push_multiple() {
 }
 
 #[test]
+fn interleaved_array_push_keeps_insertion_order() {
+    // Pushing onto a key again after a later key keeps the key in its original
+    // position, so serialize emits it first.
+    let parsed = rc9::parse("a[]=1\nb=2\na[]=3", &rc9::RcOptions::default());
+    assert_eq!(rc9::serialize(&parsed), "a.0=1\na.1=3\nb=2");
+}
+
+#[test]
 fn array_push_single_onto_fresh_key() {
     let parsed = rc9::parse("list[]=only", &rc9::RcOptions::default());
     assert_eq!(parsed, json!({ "list": ["only"] }));
