@@ -108,7 +108,7 @@ fn normalize_number(num: serde_json::Number) -> Value {
     }
     if let Some(f) = num.as_f64() {
         if f.is_finite() && f.fract() == 0.0 {
-            if f >= 0.0 && f <= u64::MAX as f64 {
+            if f >= 0.0 && f < u64::MAX as f64 {
                 return Value::Number((f as u64).into());
             }
             if f >= i64::MIN as f64 && f <= i64::MAX as f64 {

@@ -34,6 +34,15 @@ fn exponent_form() {
 }
 
 #[test]
+fn float_at_u64_rounding_boundary_stays_float() {
+    let value = coerce("1.8446744073709552e19");
+    let number = value.as_number().unwrap();
+
+    assert_eq!(number.as_u64(), None);
+    assert_eq!(number.as_f64(), Some(1.8446744073709552e19));
+}
+
+#[test]
 fn booleans_and_null() {
     assert_eq!(coerce("true"), json!(true));
     assert_eq!(coerce("false"), json!(false));
