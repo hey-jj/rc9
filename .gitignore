@@ -3,6 +3,7 @@ Cargo.lock
 **/*.rs.bk
 *.md
 !README.md
+!CHANGELOG.md
 *token*
 
 # Scratch probe files. Keep throwaway experiments out of tests/, where cargo

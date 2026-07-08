@@ -1,6 +1,6 @@
 [package]
 name = "rc9"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "Read and write flat rc-style dotfile config with dotted keys and type coercion"
 license = "MIT"
